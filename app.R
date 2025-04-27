@@ -264,29 +264,4 @@ shinyApp(ui = ui, server = server)
 
 library(rsconnect)
 
-2
-rsconnect::setAccountInfo(name='jimmymega', 
-                          token='2BB4FBD759719DB0716D4CD468FD3386',
-                          secret='Z8rMNdmwYoc36hAViM6BybGztmij6LoX5ev/2S/h')
-
-setwd("C:/Users/GoodGame/Mi unidad/shinyHW")
-rsconnect::deployApp("C:/Users/GoodGame/Mi unidad/shinyHW/")
-
-
-
-
-
-
-
-
-gena <- data.frame( a1 = (p2 *    p4 ) * c( 1  ,  0 ,   0 ),
-                    a2 = (p2 * (1-p4)) * c(0.5 , 0.5,   0 ),
-                    a3 = (pq *    p4 ) * c(0.5 , 0.5,   0 ),
-                    a4 = (p2 * (1-p4)) * c(0.25, 0.5, 0.25),
-                    a5 =     q2        * c( 0  ,  0 ,   1 ),
-                    sum= c(a1[1]+a2[1]+a3[1]))
-rownames(gena) <- c("AA", "Aa", "aa")
-
-gena2 <- rbind(t(gena), 
-               rowSums(gena))
 

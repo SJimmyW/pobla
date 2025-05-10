@@ -26,7 +26,7 @@ ui <- fluidPage(
                     "Apareamiento clasificado negativo", 
                     "Consanguinidad",
                     "Deriva genética",
-                    "Apareamiento"
+                    "cruzamiento"
                   )),
       
       # Panel para selección (usa indexOf en lugar de includes)
@@ -71,7 +71,7 @@ ui <- fluidPage(
       ),
       
       conditionalPanel(
-        condition = "input.fuerza == 'Apareamiento'",
+        condition = "input.fuerza == 'cruzamiento'",
         fluidRow(
           column(6,
                  textInput("genotipo_padre", "Genotipo del padre:", 
@@ -80,34 +80,25 @@ ui <- fluidPage(
                  textInput("genotipo_madre", "Genotipo de la madre:", 
                            value = "", placeholder = "Ej: aa"))
         ),
-        conditionalPanel(
-          condition = "input.fuerza == 'Apareamiento'",
-          numericInput("ndesc", "Número de descendientes:",
-                       value = 1, min = 1, max = 50, step = 1),
-        ),
-
+        
+        numericInput("ndesc", "Número de descendientes:",
+                     value = 1, min = 1, max = 50, step = 1)
       )
     ),
     
     mainPanel(
-      #plotOutput("barplot"),
-      uiOutput("plot_principal"),
-      
+      plotOutput("barplot"),
       conditionalPanel(
         condition = "input.fuerza == 'Deriva genética' || input.fuerza.indexOf('Selección') !== -1",
         plotOutput("evolplot")
-        ),
-    #  plotOutput("barplot_geno"),
-     # conditionalPanel(
-      #  condition = "input.fuerza == 'Apareamiento'",
-             #),
-      
-    conditionalPanel(
-        condition = "input.fuerza == 'Apareamiento'",
+      ),
+      conditionalPanel(
+        condition = "input.fuerza == 'cruzamiento'",
+        h4("Probabilidades genotípicas posibles"),
         tableOutput("tabla_probs"),
         h4("Descendencia simulada"),
         verbatimTextOutput("desc_simulada")
-        )
+      )
     )
   )
 )
@@ -117,7 +108,7 @@ server <- function(input, output, session) {
   
   observeEvent(input$p, {
     
-    req(input$fuerza != "Apareamiento")
+    req(input$fuerza != "cruzamiento")
     
     updateSliderInput(session, "q",
                       value = round(1 - input$p, 3))
@@ -126,22 +117,14 @@ server <- function(input, output, session) {
       
   observeEvent(input$q, {
     
-    req(input$fuerza != "Apareamiento")
+    req(input$fuerza != "cruzamiento")
     
     updateSliderInput(session, "p", value = round(1 - input$q, 3))
   })
   
-  output$plot_principal <- renderUI({
-    if (input$fuerza == "Apareamiento") {
-      plotOutput("barplot_geno")
-    } else {
-      plotOutput("barplot")
-    }
-  })
-  
   output$barplot <- renderPlot({
     
-    req(input$fuerza != "Apareamiento")
+    req(input$fuerza != "cruzamiento")
     
     q <- input$q
     p <- 1 - q
@@ -250,7 +233,6 @@ server <- function(input, output, session) {
   
   output$evolplot <- renderPlot({
     fuerza <- input$fuerza
-    req(input$fuerza != "Apareamiento")
     q <- input$q
     p <- 1 - q
     
@@ -303,89 +285,31 @@ server <- function(input, output, session) {
           q_vec[j] <- rbinom(1, 2 * N, q_vec[j - 1]) / (2 * N)
         }
         df_drift <- rbind(df_drift,
-                          data.frame(Generación = 1:ngen, 
-                                     q = q_vec, 
-                                     Población = paste("Pop", i)))
+                          data.frame(Generación = 1:ngen, q = q_vec, Población = paste("Pop", i)))
       }
       
       ggplot(df_drift, aes(x = Generación, y = q, color = Población)) +
         geom_line(size = 1) +
         labs(title = "Deriva genética del alelo q en múltiples poblaciones",
-             x = "Generación",
-             y = "Frecuencia del alelo q") +
+             x = "Generación", y = "Frecuencia del alelo q") +
         ylim(0, 1) +
         theme_minimal(base_size = 15) +
         theme(legend.position = "right")
     }
   })
   
-  output$barplot_geno <- renderPlot({
-
-    req(input$fuerza == "Apareamiento",
-        nzchar(as.character(input$genotipo_padre)),
-        nzchar(as.character(input$genotipo_madre)))
+  ###############################################
+  output$barplot <- renderPlot({
     
-    padre_str <- as.character(input$genotipo_padre)
-    madre_str <- as.character(input$genotipo_madre)
-   
-     validate(
-      need(nchar(padre_str) == nchar(madre_str), 
-           "Genotipos de diferente longitud")
-    )
+    req(input$fuerza == "cruzamiento")
     
-    # Separa alelos y generar gametos
-    n_alleles <- nchar(padre_str)
-    n_genes <- n_alleles / 2
-    
-    split_alleles <- function(geno) split(strsplit(geno, "")[[1]], rep(1:n_genes, each=2))
-    p_alleles <- split_alleles(padre_str)
-    m_alleles <- split_alleles(madre_str)
-    gam_p <- apply(expand.grid(p_alleles, stringsAsFactors=FALSE), 1, paste0, collapse="")
-    gam_m <- apply(expand.grid(m_alleles, stringsAsFactors=FALSE), 1, paste0, collapse="")
-    combos <- expand.grid(gam_p, gam_m, stringsAsFactors=FALSE)
-    
-    # Formar genotipos hijos ordenados
-    hijos <- apply(combos, 1, function(x) {
-      gp <- strsplit(x[[1]], "")[[1]]
-      gm <- strsplit(x[[2]], "")[[1]]
-      gene_strs <- vapply(seq_len(n_genes), function(i) {
-        pair <- c(gp[i], gm[i])
-        ord <- order(tolower(pair), -(pair == toupper(pair)))
-        paste0(pair[ord], collapse="")
-      }, "")
-      paste0(gene_strs, collapse="")
-    })
-    
-    # Tabla de probabilidades
-    tab <- as.data.frame(table(hijos) / length(hijos),
-                         stringsAsFactors = FALSE)
-    colnames(tab) <- c("Genotipo", "Probabilidad")
-    # Añadir fracción
-    tab$Fraccion <- as.character(fractions(tab$Probabilidad))
-    tab <- tab[order(tab$Genotipo), ]
-    
-    # Graficar
-    ggplot(tab, aes(x = Genotipo, y = Probabilidad)) +
-      geom_col(fill = "steelblue") +
-      geom_text(aes(label = Fraccion), vjust = -0.5, size = 5) +
-      labs(title = "Probabilidades genotípicas - Apareamiento",
-           x = "Genotipo", y = "Probabilidad") +
-      scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
-      theme_minimal(base_size = 14)
-  })
-
-  output$tabla_probs <- renderTable({
-    
-    req(input$fuerza == "Apareamiento",
-        nzchar(as.character(input$genotipo_padre)),
-        nzchar(as.character(input$genotipo_madre)))
-    
+    padre_str <- input$genotipo_padre
+    madre_str <- input$genotipo_madre
     validate(
       need(nchar(padre_str) == nchar(madre_str), 
-           "Genotipos de diferente longitud") )
-    
-    padre_str <- as.character(input$genotipo_padre)
-    madre_str <- as.character(input$genotipo_madre)
+           "Genotipos de diferente longitud"),
+      #need(nchar(padre_str) %in% c(2, 4),"Genotipos deben tener 2 o 4 letras (1 o 2 genes)")
+    )
     
     nalelos <- nchar(padre_str)
     n_genes <- nalelos / 2
@@ -399,7 +323,7 @@ server <- function(input, output, session) {
     padre_alelos <- sep_alelos(padre_str)
     madre_alelos <- sep_alelos(madre_str)
     
-    # Generar lista de gametos posibles (uno por gen)
+    # lista de gametos posibles (uno por gen)
     gametos_padre <- expand.grid(padre_alelos, 
                                  stringsAsFactors = FALSE)
     gametos_padre <- apply(gametos_padre, 1, paste0, collapse = "")
@@ -433,28 +357,36 @@ server <- function(input, output, session) {
     probs <- as.data.frame(table(hijos) / length(hijos))
     colnames(probs) <- c("Genotipo", "Probabilidad")
     probs[order(probs$Genotipo), , drop = FALSE]
+    #####
+    q <- input$q
+    p <- 1 - q
     
-  }, rownames = TRUE)
-  
-  output$desc_simulada <- renderPrint({
+    hwe <- c(AA = p^2, Aa = 2*p*q, aa = q^2)
     
-    req(input$fuerza == "Apareamiento",
-        nzchar(as.character(input$genotipo_padre)),
-        nzchar(as.character(input$genotipo_madre)))
+    ggplot(probs, aes(x = Genotipo, y = Probabilidad))#, fill = Estado)) +
+      geom_bar(stat = "identity", position = "dodge") +
+      scale_color_brewer(palette = "Set1") + # scale_fill_manual(values = c("#999999", "#0072B2")) +
+      labs(title = "Comparación de frecuencias genotípicas",
+           y = "Frecuencia", x = "Genotipo") +
+      ylim(0,1) +
+      theme_minimal(base_size = 15)
+  })
+  ####################################################
+  output$tabla_probs <- renderTable({
+    req(input$fuerza == "cruzamiento")
     
-    padre_str <- as.character(input$genotipo_padre)
-    madre_str <- as.character(input$genotipo_madre)
-    
+    padre_str <- input$genotipo_padre
+    madre_str <- input$genotipo_madre
     validate(
-      need(nchar(as.character(padre_str)) == nchar(as.character(madre_str)), 
-           "Genotipos de diferente longitud") 
-      )
+      need(nchar(padre_str) == nchar(madre_str), 
+           "Genotipos de diferente longitud"),
+      #need(nchar(padre_str) %in% c(2, 4),"Genotipos deben tener 2 o 4 letras (1 o 2 genes)")
+    )
     
     nalelos <- nchar(padre_str)
     n_genes <- nalelos / 2
     
-    n <- input$ndesc
-    
+    # Función para separar alelos por gen
     sep_alelos <- function(geno_str) {
       alelos <- strsplit(geno_str, "")[[1]]
       split(alelos, rep(1:n_genes, each = 2))
@@ -463,37 +395,78 @@ server <- function(input, output, session) {
     padre_alelos <- sep_alelos(padre_str)
     madre_alelos <- sep_alelos(madre_str)
     
-    gametos_padre <- apply(expand.grid(padre_alelos,
-                                       stringsAsFactors = FALSE), 
-                           1, paste0, collapse = "")
-    gametos_madre <- apply(expand.grid(madre_alelos,
-                                       stringsAsFactors = FALSE), 
-                           1, paste0, collapse = "")
+    # Generar lista de gametos posibles (uno por gen)
+    gametos_padre <- expand.grid(padre_alelos, stringsAsFactors = FALSE)
+    gametos_padre <- apply(gametos_padre, 1, paste0, collapse = "")
     
-    gametos_p <- sample(gametos_padre, n, replace = TRUE)
-    gametos_m <- sample(gametos_madre, n, replace = TRUE)
+    gametos_madre <- expand.grid(madre_alelos, stringsAsFactors = FALSE)
+    gametos_madre <- apply(gametos_madre, 1, paste0, collapse = "")
     
-    # Función para ordenar alelos gen por gen
-    hijos <- mapply(function(p, m) {
-      gp <- strsplit(p, "")[[1]]
-      gm <- strsplit(m, "")[[1]]
+    # combinaciones padre - madre
+    combos <- expand.grid(gametos_padre, 
+                          gametos_madre, 
+                          stringsAsFactors = FALSE)
+    
+    # cada combinación,dell genotipo hijo ordenando cada par
+    hijos <- apply(combos, 1, function(x) {
+      
+      gp <- strsplit(x[[1]], "")[[1]]
+      gm <- strsplit(x[[2]], "")[[1]]
       
       geno_progenie <- vapply(seq_len(n_genes), function(i) {
         pair <- c(gp[i], gm[i])
+        # Orden mayúscula antes que minúscula y alfabético
         ord <- order(tolower(pair), -(pair == toupper(pair)))
         paste0(pair[ord], collapse = "")
       }, FUN.VALUE = "")
       
       paste0(geno_progenie, collapse = "")
-    }, gametos_p, gametos_m)
+    })
     
-    tabla <- sort(table(hijos), decreasing = TRUE)
+    # Calcular probabilidades
+    probs <- as.data.frame(table(hijos) / length(hijos))
+    colnames(probs) <- c("Genotipo", "Probabilidad")
+    probs[order(probs$Genotipo), , drop = FALSE]
     
-    cat("Genotipos posibles y frecuencia:\n")
-    print(tabla)
-   
+  }, rownames = TRUE)
+  
+  
+  output$desc_simulada <- renderPrint({
+    
+    req(input$fuerza == "cruzamiento")
+    
+    padre <- strsplit(input$genotipo_padre, "")[[1]]
+    madre <- strsplit(input$genotipo_madre, "")[[1]]
+    
+    validate(
+      need(length(padre) == length(madre),
+           "Genotipos de diferente longitud")
+    )
+    
+    n <- input$ndesc
+    
+    # Muestreo de gametos
+    gameto_p <- replicate(n, paste0(sample(padre, length(padre),
+                                           replace = TRUE), 
+                                    collapse = ""))
+    gameto_m <- replicate(n, paste0(sample(madre, 
+                                           length(madre), 
+                                           replace = TRUE),
+                                    collapse = ""))
+    
+    hijos <- mapply(function(p, m) paste0(sort(c(strsplit(p, "")[[1]], 
+                                                 strsplit(m, "")[[1]])),
+                                          collapse = ""), gameto_p, gameto_m)
+    
+    cat(hijos, sep = "\n")
   })
   
+  ###########
+}
+
+shinyApp(ui = ui, server = server)
+
+
   }
 
 shinyApp(ui = ui, server = server)

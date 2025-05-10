@@ -1,7 +1,7 @@
 FROM rocker/shiny:latest
 
 # Instala los paquetes necesarios
-RUN R -e "install.packages(c('shiny', 'MASS', 'ggplot2'), repos='https://cloud.r-project.org')"
+RUN R -e "install.packages(c('shiny', ggplot2','dplyr', 'tidyr', 'ggplot2','lubridate','readr','writexl','readxl','purrr), repos='https://cloud.r-project.org')"
 
 # Copia la app en el contenedor
 COPY . /srv/shiny-server/

@@ -1,10 +1,8 @@
 
 library(shiny)
 library(ggplot2)
-update.packages("rsconnect")
-library(rsconnect)
 library(MASS)
-
+options(shiny.error = recover)
 ui <- fluidPage(
   titlePanel("Fuerzas evolutivas y equilibrio Hardy-Weinberg"),
   

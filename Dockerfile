@@ -1,7 +1,7 @@
 FROM rocker/shiny:latest
 
 # Instala los paquetes necesarios
-RUN R -e "install.packages(c('shiny', 'dplyr', 'readr', 'lubridate', 'tidyr'), repos='https://cloud.r-project.org')"
+RUN R -e "install.packages(c('shiny', 'dplyr', 'MASS', 'tidyr'), repos='https://cloud.r-project.org')"
 
 # Copia la app en el contenedor
 COPY . /srv/shiny-server/

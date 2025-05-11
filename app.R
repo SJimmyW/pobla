@@ -261,8 +261,10 @@ server <- function(input, output, session) {
     ggplot(df, aes(x = Genotipo, y = Frecuencia, fill = Estado)) +
       geom_bar(stat = "identity", position = "dodge") +
       scale_color_brewer(palette = "Set1") + # scale_fill_manual(values = c("#999999", "#0072B2")) +
-      labs(title = "Comparación de frecuencias genotípicas",
-           y = "Frecuencia", x = "Genotipo") +
+      labs(title = "Comparación de frecuencias genotípicas (una generación a la siguiente)",
+           y = "Frecuencia",
+           x = "Genotipo",
+           color = "" ) +
       ylim(0,1) +
       theme_minimal(base_size = 15)
   })
